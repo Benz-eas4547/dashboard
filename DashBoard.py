@@ -19,19 +19,24 @@ color_map = {
 
 # กำหนดชื่อไฟล์กลางที่จะใช้เก็บข้อมูลใน Cloud
 CENTRAL_FILE_PATH = "central_data.xlsx"
+META_FILE_NAME = "file_name_meta.txt"  # ใช้เก็บบันทึกชื่อไฟล์จริงไว้
 
-# จัดการจำชื่อไฟล์ล่าสุดผ่าน session_state
+# จัดการจำชื่อไฟล์ล่าสุดผ่าน session_state และอ่านค่าจากไฟล์ meta (ถ้ามี)
 if 'current_file_name' not in st.session_state:
-    if os.path.exists(CENTRAL_FILE_PATH):
-        st.session_state.current_file_name = CENTRAL_FILE_PATH
+    if os.path.exists(META_FILE_NAME):
+        with open(META_FILE_NAME, "r", encoding="utf-8") as f:
+            st.session_state.current_file_name = f.read().strip()
     else:
         st.session_state.current_file_name = ""
 
-target_file = st.session_state.current_file_name
+target_file = CENTRAL_FILE_PATH
+display_filename = st.session_state.current_file_name
 
-# ดึงชื่อไฟล์มาแสดงผลเป็นวันที่ (ถ้ามีไฟล์)
-if target_file and os.path.exists(target_file):
-    file_display_name = os.path.splitext(os.path.basename(target_file))[0]
+# ดึงชื่อไฟล์มาตัดนามสกุลออกเพื่อแสดงผลเป็นวันที่
+if display_filename:
+    file_display_name = os.path.splitext(os.path.basename(display_filename))[0]
+elif os.path.exists(CENTRAL_FILE_PATH):
+    file_display_name = "ข้อมูลล่าสุด"
 else:
     file_display_name = "ยังไม่มีไฟล์ข้อมูล"
 
@@ -82,8 +87,11 @@ if st.session_state.is_admin and (selected_mode == "อัปโหลดไฟ�
         with open(CENTRAL_FILE_PATH, "wb") as f:
             f.write(uploaded_file.getbuffer())
         
-        # บันทึกชื่อจริงของไฟล์ไว้แสดงผลหัวข้อ
+        # บันทึกชื่อจริงของไฟล์เก็บไว้ใน meta file
         st.session_state.current_file_name = uploaded_file.name
+        with open(META_FILE_NAME, "w", encoding="utf-8") as f:
+            f.write(uploaded_file.name)
+            
         st.sidebar.success(f"✅ อัปโหลดไฟล์ {uploaded_file.name} สำเร็จ!")
         st.rerun()
     
