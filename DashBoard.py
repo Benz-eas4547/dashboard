@@ -17,28 +17,25 @@ color_map = {
     'SPG': '#FF7F50'   # สีส้ม
 }
 
-# กำหนดชื่อไฟล์กลางที่จะใช้เก็บข้อมูลใน Cloud
+# กำหนดชื่อไฟล์กลางและไฟล์เก็บชื่อ
 CENTRAL_FILE_PATH = "central_data.xlsx"
-META_FILE_NAME = "file_name_meta.txt"  # ใช้เก็บบันทึกชื่อไฟล์จริงไว้
+META_FILE_NAME = "file_name_meta.txt"
 
-# จัดการจำชื่อไฟล์ล่าสุดผ่าน session_state และอ่านค่าจากไฟล์ meta (ถ้ามี)
-if 'current_file_name' not in st.session_state:
+# ฟังก์ชันดึงชื่อไฟล์ล่าสุดจากเซิร์ฟเวอร์ (ทุกคนเห็นตรงกันโดยอัตโนมัติ)
+def get_display_filename():
     if os.path.exists(META_FILE_NAME):
-        with open(META_FILE_NAME, "r", encoding="utf-8") as f:
-            st.session_state.current_file_name = f.read().strip()
-    else:
-        st.session_state.current_file_name = ""
+        try:
+            with open(META_FILE_NAME, "r", encoding="utf-8") as f:
+                name = f.read().strip()
+                if name:
+                    return os.path.splitext(os.path.basename(name))[0]
+        except:
+            pass
+    if os.path.exists(CENTRAL_FILE_PATH):
+        return "ข้อมูลล่าสุด"
+    return "ยังไม่มีไฟล์ข้อมูล"
 
-target_file = CENTRAL_FILE_PATH
-display_filename = st.session_state.current_file_name
-
-# ดึงชื่อไฟล์มาตัดนามสกุลออกเพื่อแสดงผลเป็นวันที่
-if display_filename:
-    file_display_name = os.path.splitext(os.path.basename(display_filename))[0]
-elif os.path.exists(CENTRAL_FILE_PATH):
-    file_display_name = "ข้อมูลล่าสุด"
-else:
-    file_display_name = "ยังไม่มีไฟล์ข้อมูล"
+file_display_name = get_display_filename()
 
 # แสดงหัวข้อรายงาน
 st.markdown(f"### 📊 ระบบรายงาน Dashboard ยอดขายฝากและเงินเก๊ะ ประจำวันที่: {file_display_name}")
@@ -47,13 +44,12 @@ st.markdown("---")
 # 2. ระบบจัดการสิทธิ์แอดมินใน Sidebar
 st.sidebar.markdown("### 📁 จัดการข้อมูล Excel")
 
-# ตั้งรหัสผ่านสำหรับแอดมิน
 ADMIN_PASSWORD = "1234" 
 
 if "is_admin" not in st.session_state:
     st.session_state.is_admin = False
 
-# ถ้ายังไม่มีไฟล์ในระบบ บังคับให้เปิดโหมดแอดมินทันทีเพื่อให้กดอัปโหลดได้เลย
+# ถ้ายังไม่มีไฟล์ในระบบ บังคับให้เปิดโหมดแอดมินทันที
 if not os.path.exists(CENTRAL_FILE_PATH):
     st.session_state.is_admin = True
     st.sidebar.warning("⚠️ ยังไม่พบข้อมูลในระบบ กรุณาเข้าสู่ระบบแอดมินเพื่ออัปโหลดไฟล์")
@@ -64,7 +60,7 @@ if st.session_state.is_admin:
 
 selected_mode = st.sidebar.selectbox("เลือกโหมดการใช้งาน:", mode_options)
 
-# ช่องกรอกรหัสผ่าน (ถ้ายังไม่login)
+# ช่องกรอกรหัสผ่าน
 if not st.session_state.is_admin:
     st.sidebar.markdown("---")
     with st.sidebar.expander("🔐 สำหรับแอดมิน (อัปเดตข้อมูล)"):
@@ -83,63 +79,62 @@ if st.session_state.is_admin and (selected_mode == "อัปโหลดไฟ�
     st.sidebar.markdown("#### 📤 อัปโหลดไฟล์ประจำวัน")
     uploaded_file = st.sidebar.file_uploader("เลือกไฟล์ Excel ของคุณ", type=["xlsx", "xls"])
     if uploaded_file is not None:
-        # บันทึกไฟล์ลงเซิร์ฟเวอร์ด้วยชื่อกลาง
-        with open(CENTRAL_FILE_PATH, "wb") as f:
-            f.write(uploaded_file.getbuffer())
-        
-        # บันทึกชื่อจริงของไฟล์เก็บไว้ใน meta file
-        st.session_state.current_file_name = uploaded_file.name
-        with open(META_FILE_NAME, "w", encoding="utf-8") as f:
-            f.write(uploaded_file.name)
+        try:
+            # บันทึกไฟล์หลัก
+            with open(CENTRAL_FILE_PATH, "wb") as f:
+                f.write(uploaded_file.getbuffer())
             
-        st.sidebar.success(f"✅ อัปโหลดไฟล์ {uploaded_file.name} สำเร็จ!")
-        st.rerun()
+            # บันทึกชื่อไฟล์จริงลง Text กลางเพื่อให้ทุกคนเห็นชื่อเดียวกัน
+            with open(META_FILE_NAME, "w", encoding="utf-8") as f:
+                f.write(uploaded_file.name)
+                
+            st.sidebar.success(f"✅ อัปโหลดไฟล์ {uploaded_file.name} สำเร็จ!")
+            st.rerun()
+        except Exception as e:
+            st.sidebar.error(f"เกิดข้อผิดพลาดในการบันทึกไฟล์: {e}")
     
     if os.path.exists(CENTRAL_FILE_PATH) and st.sidebar.button("ออกจากระบบแอดมิน"):
         st.session_state.is_admin = False
         st.rerun()
 
-# 3. เริ่มประมวลผลข้อมูลหากมีไฟล์พร้อมใช้งานบนระบบ Cloud แล้ว
+# 3. เริ่มประมวลผลข้อมูลหากมีไฟล์พร้อมใช้งาน
 if os.path.exists(CENTRAL_FILE_PATH):
     try:
-        df_raw = pd.read_excel(CENTRAL_FILE_PATH, sheet_name='ส่งเสี่ย', header=5)
-        
-        # จัดการชื่อคอลัมน์
-        col_mapping = {
-            df_raw.columns[0]: 'ลำดับ',
-            df_raw.columns[1]: 'บริษัท_raw',
-            df_raw.columns[2]: 'สาขา',
-            df_raw.columns[3]: 'ยอดขายฝาก',
-            df_raw.columns[4]: 'ยอดเงินเก๊ะใหญ่',
-            df_raw.columns[5]: 'ยอดเงินเก๊ะขายฝาก'
-        }
-        
-        df = df_raw.rename(columns=col_mapping)[['ลำดับ', 'บริษัท_raw', 'สาขา', 'ยอดขายฝาก', 'ยอดเงินเก๊ะใหญ่', 'ยอดเงินเก๊ะขายฝาก']].copy()
-        
-        # กรองเฉพาะแถวข้อมูลสาขาจริง
-        df = df.dropna(subset=['สาขา', 'ลำดับ'])
-        df = df[~df['สาขา'].astype(str).str.contains('รวม|หมายเหตุ|\*', na=False)]
-        df['ลำดับ'] = pd.to_numeric(df['ลำดับ'], errors='coerce')
-        df = df.dropna(subset=['ลำดับ'])
-        
-        # แปลงข้อมูลตัวเลข
-        for col in ['ยอดขายฝาก', 'ยอดเงินเก๊ะใหญ่', 'ยอดเงินเก๊ะขายฝาก']:
-            df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
+        # ใช้ caching เพื่อป้องกันการอ่านไฟล์ซ้ำแล้วค้างเวลาคนกด F5 พร้อมกัน
+        @st.cache_data(ttl=5) # โหลดใหม่ทุกๆ 5 วินาทีหากมีการอัปเดต
+        def load_data(file_path):
+            df_raw = pd.read_excel(file_path, sheet_name='ส่งเสี่ย', header=5)
+            col_mapping = {
+                df_raw.columns[0]: 'ลำดับ',
+                df_raw.columns[1]: 'บริษัท_raw',
+                df_raw.columns[2]: 'สาขา',
+                df_raw.columns[3]: 'ยอดขายฝาก',
+                df_raw.columns[4]: 'ยอดเงินเก๊ะใหญ่',
+                df_raw.columns[5]: 'ยอดเงินเก๊ะขายฝาก'
+            }
+            df = df_raw.rename(columns=col_mapping)[['ลำดับ', 'บริษัท_raw', 'สาขา', 'ยอดขายฝาก', 'ยอดเงินเก๊ะใหญ่', 'ยอดเงินเก๊ะขายฝาก']].copy()
+            df = df.dropna(subset=['สาขา', 'ลำดับ'])
+            df = df[~df['สาขา'].astype(str).str.contains('รวม|หมายเหตุ|\*', na=False)]
+            df['ลำดับ'] = pd.to_numeric(df['ลำดับ'], errors='coerce')
+            df = df.dropna(subset=['ลำดับ'])
             
-        df['ยอดรวม'] = df['ยอดขายฝาก'] + df['ยอดเงินเก๊ะใหญ่'] + df['ยอดเงินเก๊ะขายฝาก']
-            
-        def map_company(val):
-            val_str = str(val).strip().upper()
-            if val_str == 'POM':
-                return 'POM'
-            elif val_str == 'SPG':
-                return 'SPG'
-            else:
-                return 'YKT'
+            for col in ['ยอดขายฝาก', 'ยอดเงินเก๊ะใหญ่', 'ยอดเงินเก๊ะขายฝาก']:
+                df[col] = pd.to_numeric(df[col].astype(str).str.replace(',', ''), errors='coerce').fillna(0)
                 
-        df['บริษัท'] = df['บริษัท_raw'].apply(map_company)
+            df['ยอดรวม'] = df['ยอดขายฝาก'] + df['ยอดเงินเก๊ะใหญ่'] + df['ยอดเงินเก๊ะขายฝาก']
+            
+            def map_company(val):
+                val_str = str(val).strip().upper()
+                if val_str == 'POM': return 'POM'
+                elif val_str == 'SPG': return 'SPG'
+                else: return 'YKT'
+                    
+            df['บริษัท'] = df['บริษัท_raw'].apply(map_company)
+            return df
+
+        df = load_data(CENTRAL_FILE_PATH)
         
-        # Sidebar ตัวกรองข้อมูลสำหรับผู้ใช้งานทั่วไป
+        # Sidebar ตัวกรองข้อมูล
         st.sidebar.markdown("---")
         st.sidebar.markdown("### 🎯 ตัวกรองการแสดงผล")
         
