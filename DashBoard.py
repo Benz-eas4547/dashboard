@@ -17,45 +17,49 @@ color_map = {
     'SPG': '#FF7F50'   # สีส้ม
 }
 
-# กำหนดชื่อไฟล์กลางตั้งต้นในระบบ
-DEFAULT_CENTRAL_FILE = "20.09.69 แปลง.xlsx"
+# กำหนดชื่อไฟล์กลางที่จะใช้เก็บข้อมูลใน Cloud
+CENTRAL_FILE_PATH = "central_data.xlsx"
 
-# จัดการจำชื่อไฟล์ล่าสุดผ่าน session_state เพื่อให้หัวข้ออัปเดตตามทันที
+# จัดการจำชื่อไฟล์ล่าสุดผ่าน session_state
 if 'current_file_name' not in st.session_state:
-    if os.path.exists(DEFAULT_CENTRAL_FILE):
-        st.session_state.current_file_name = DEFAULT_CENTRAL_FILE
+    if os.path.exists(CENTRAL_FILE_PATH):
+        st.session_state.current_file_name = CENTRAL_FILE_PATH
     else:
         st.session_state.current_file_name = ""
 
 target_file = st.session_state.current_file_name
 
-# ดึงชื่อไฟล์มาตัดนามสกุลออกเพื่อแสดงผลเป็นวันที่
+# ดึงชื่อไฟล์มาแสดงผลเป็นวันที่ (ถ้ามีไฟล์)
 if target_file and os.path.exists(target_file):
     file_display_name = os.path.splitext(os.path.basename(target_file))[0]
 else:
-    file_display_name = "-"
+    file_display_name = "ยังไม่มีไฟล์ข้อมูล"
 
-# แสดงหัวข้อรายงานพร้อมดึงชื่อวันที่ตามไฟล์ล่าสุด
+# แสดงหัวข้อรายงาน
 st.markdown(f"### 📊 ระบบรายงาน Dashboard ยอดขายฝากและเงินเก๊ะ ประจำวันที่: {file_display_name}")
 st.markdown("---")
 
 # 2. ระบบจัดการสิทธิ์แอดมินใน Sidebar
 st.sidebar.markdown("### 📁 จัดการข้อมูล Excel")
 
-# ตั้งรหัสผ่านสำหรับแอดมินที่นี่ (สามารถเปลี่ยนเลขได้ตามต้องการ)
+# ตั้งรหัสผ่านสำหรับแอดมิน
 ADMIN_PASSWORD = "1234" 
 
-# สร้างปุ่มให้เลือกโหมด (สำหรับแอดมินใส่รหัส)
-mode_options = ["ดูข้อมูลทั่วไป (ผู้ชมทั่วไป)"]
 if "is_admin" not in st.session_state:
     st.session_state.is_admin = False
 
+# ถ้ายังไม่มีไฟล์ในระบบ บังคับให้เปิดโหมดแอดมินทันทีเพื่อให้กดอัปโหลดได้เลย
+if not os.path.exists(CENTRAL_FILE_PATH):
+    st.session_state.is_admin = True
+    st.sidebar.warning("⚠️ ยังไม่พบข้อมูลในระบบ กรุณาเข้าสู่ระบบแอดมินเพื่ออัปโหลดไฟล์")
+
+mode_options = ["ดูข้อมูลทั่วไป (ผู้ชมทั่วไป)"]
 if st.session_state.is_admin:
     mode_options.append("อัปโหลดไฟล์ Excel ใหม่ (แอดมิน)")
 
 selected_mode = st.sidebar.selectbox("เลือกโหมดการใช้งาน:", mode_options)
 
-# ถ้ายัังไม่ได้เป็นแอดมิน ให้มีช่องกรอกรหัสผ่านด้านล่าง
+# ช่องกรอกรหัสผ่าน (ถ้ายังไม่login)
 if not st.session_state.is_admin:
     st.sidebar.markdown("---")
     with st.sidebar.expander("🔐 สำหรับแอดมิน (อัปเดตข้อมูล)"):
@@ -69,28 +73,28 @@ if not st.session_state.is_admin:
                 st.error("รหัสผ่านไม่ถูกต้อง")
 
 # เมนูอัปโหลดไฟล์สำหรับแอดมิน
-if st.session_state.is_admin and selected_mode == "อัปโหลดไฟล์ Excel ใหม่ (แอดมิน)":
+if st.session_state.is_admin and (selected_mode == "อัปโหลดไฟล์ Excel ใหม่ (แอดมิน)" or not os.path.exists(CENTRAL_FILE_PATH)):
     st.sidebar.markdown("---")
     st.sidebar.markdown("#### 📤 อัปโหลดไฟล์ประจำวัน")
     uploaded_file = st.sidebar.file_uploader("เลือกไฟล์ Excel ของคุณ", type=["xlsx", "xls"])
     if uploaded_file is not None:
-        save_path = uploaded_file.name
-        with open(save_path, "wb") as f:
+        # บันทึกไฟล์ลงเซิร์ฟเวอร์ด้วยชื่อกลาง
+        with open(CENTRAL_FILE_PATH, "wb") as f:
             f.write(uploaded_file.getbuffer())
         
-        # บันทึกชื่อไฟล์ใหม่ลง session state และรีเฟรชทันที
-        st.session_state.current_file_name = save_path
+        # บันทึกชื่อจริงของไฟล์ไว้แสดงผลหัวข้อ
+        st.session_state.current_file_name = uploaded_file.name
         st.sidebar.success(f"✅ อัปโหลดไฟล์ {uploaded_file.name} สำเร็จ!")
         st.rerun()
     
-    if st.sidebar.button("ออกจากระบบแอดมิน"):
+    if os.path.exists(CENTRAL_FILE_PATH) and st.sidebar.button("ออกจากระบบแอดมิน"):
         st.session_state.is_admin = False
         st.rerun()
 
-# 3. เริ่มประมวลผลข้อมูลหากมีไฟล์พร้อมใช้งาน
-if target_file and os.path.exists(target_file):
+# 3. เริ่มประมวลผลข้อมูลหากมีไฟล์พร้อมใช้งานบนระบบ Cloud แล้ว
+if os.path.exists(CENTRAL_FILE_PATH):
     try:
-        df_raw = pd.read_excel(target_file, sheet_name='ส่งเสี่ย', header=5)
+        df_raw = pd.read_excel(CENTRAL_FILE_PATH, sheet_name='ส่งเสี่ย', header=5)
         
         # จัดการชื่อคอลัมน์
         col_mapping = {
@@ -255,7 +259,7 @@ if target_file and os.path.exists(target_file):
         st.markdown("---")
         
         # ตารางแสดงผล
-        st.markdown(f"🏆 **5 สาขาที่สูงสุด และ 5 สาขาที่ต่ำที่สุด ({metric_title})**")
+,       st.markdown(f"🏆 **5 สาขาที่สูงสุด และ 5 สาขาที่ต่ำที่สุด ({metric_title})**")
         if not df_filtered.empty:
             df_sorted = df_filtered.sort_values(by=selected_col, ascending=False).reset_index(drop=True)
             
@@ -280,5 +284,4 @@ if target_file and os.path.exists(target_file):
     except Exception as e:
         st.error(f"เกิดข้อผิดพลาดในการประมวลผลไฟล์: {e}")
 else:
-    st.warning("⚠️ ยังไม่พบไฟล์ข้อมูลกลางในระบบ")
-    st.info("💡 คำแนะนำสำหรับแอดมิน: กรุณาขยายเมนู 'สำหรับแอดมิน' ด้านซ้าย ใส่รหัสผ่านเพื่ออัปโหลดไฟล์ตั้งต้นขึ้นระบบครับ")
+    st.info("💡 เมื่อเปิดเว็บครั้งแรก ระบบจะบังคับให้เปิดช่องอัปโหลดไฟล์ทางด้านซ้ายอัตโนมัติ ให้คุณเลือกไฟล์ Excel จากเครื่องของคุณเพื่อเริ่มต้นใช้งานได้ทันทีครับ!")
