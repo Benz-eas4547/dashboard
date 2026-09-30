@@ -10,9 +10,6 @@ st.set_page_config(
     layout="wide"
 )
 
-st.markdown("### 📊 ระบบรายงาน Dashboard ยอดขายฝากและเงินเก๊ะ")
-st.markdown("---")
-
 # กำหนดสีประจำบริษัท
 color_map = {
     'YKT': '#4682B4',  # สีฟ้า
@@ -22,6 +19,17 @@ color_map = {
 
 # กำหนดชื่อไฟล์กลางในระบบ
 CENTRAL_FILE_PATH = "20.09.69 แปลง.xlsx"
+
+# ดึงชื่อไฟล์มาตัดนามสกุลออกเพื่อเอาไปแสดงผลเป็นวันที่ (เช่น "20.09.69 แปลง" หรือดึงเฉพาะวันที่)
+if os.path.exists(CENTRAL_FILE_PATH):
+    # ดึงชื่อไฟล์แบบไม่มีนามสกุล
+    file_display_name = os.path.splitext(CENTRAL_FILE_PATH)[0]
+else:
+    file_display_name = "-"
+
+# แสดงหัวข้อรายงานพร้อมดึงชื่อวันที่ตามไฟล์
+st.markdown(f"### 📊 ระบบรายงาน Dashboard ยอดขายฝากและเงินเก๊ะ ประจำวันที่: {file_display_name}")
+st.markdown("---")
 
 # 2. ระบบจัดการสิทธิ์แอดมินใน Sidebar
 st.sidebar.markdown("### 📁 จัดการข้อมูล Excel")
@@ -60,9 +68,12 @@ if st.session_state.is_admin and selected_mode == "อัปโหลดไฟ�
     st.sidebar.markdown("#### 📤 อัปโหลดไฟล์ประจำวัน")
     uploaded_file = st.sidebar.file_uploader("เลือกไฟล์ Excel ของคุณ", type=["xlsx", "xls"])
     if uploaded_file is not None:
+        # บันทึกไฟล์ด้วยชื่อเดิม (หรือจะใช้ชื่อตามไฟล์ที่อัปโหลดเข้ามาจริงก็ได้)
+        CENTRAL_FILE_PATH = uploaded_file.name
         with open(CENTRAL_FILE_PATH, "wb") as f:
             f.write(uploaded_file.getbuffer())
-        st.sidebar.success("✅ อัปโหลดและบันทึกไฟล์ใหม่เรียบร้อยแล้ว!")
+        st.sidebar.success(f"✅ อัปโหลดไฟล์ {uploaded_file.name} สำเร็จ!")
+        st.rerun()
     
     if st.sidebar.button("ออกจากระบบแอดมิน"):
         st.session_state.is_admin = False
