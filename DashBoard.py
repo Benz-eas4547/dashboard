@@ -17,17 +17,25 @@ color_map = {
     'SPG': '#FF7F50'   # สีส้ม
 }
 
-# กำหนดชื่อไฟล์กลางในระบบ
-CENTRAL_FILE_PATH = "20.09.69 แปลง.xlsx"
+# กำหนดชื่อไฟล์กลางตั้งต้นในระบบ
+DEFAULT_CENTRAL_FILE = "20.09.69 แปลง.xlsx"
 
-# ดึงชื่อไฟล์มาตัดนามสกุลออกเพื่อเอาไปแสดงผลเป็นวันที่ (เช่น "20.09.69 แปลง" หรือดึงเฉพาะวันที่)
-if os.path.exists(CENTRAL_FILE_PATH):
-    # ดึงชื่อไฟล์แบบไม่มีนามสกุล
-    file_display_name = os.path.splitext(CENTRAL_FILE_PATH)[0]
+# จัดการจำชื่อไฟล์ล่าสุดผ่าน session_state เพื่อให้หัวข้ออัปเดตตามทันที
+if 'current_file_name' not in st.session_state:
+    if os.path.exists(DEFAULT_CENTRAL_FILE):
+        st.session_state.current_file_name = DEFAULT_CENTRAL_FILE
+    else:
+        st.session_state.current_file_name = ""
+
+target_file = st.session_state.current_file_name
+
+# ดึงชื่อไฟล์มาตัดนามสกุลออกเพื่อแสดงผลเป็นวันที่
+if target_file and os.path.exists(target_file):
+    file_display_name = os.path.splitext(os.path.basename(target_file))[0]
 else:
     file_display_name = "-"
 
-# แสดงหัวข้อรายงานพร้อมดึงชื่อวันที่ตามไฟล์
+# แสดงหัวข้อรายงานพร้อมดึงชื่อวันที่ตามไฟล์ล่าสุด
 st.markdown(f"### 📊 ระบบรายงาน Dashboard ยอดขายฝากและเงินเก๊ะ ประจำวันที่: {file_display_name}")
 st.markdown("---")
 
@@ -60,18 +68,18 @@ if not st.session_state.is_admin:
             else:
                 st.error("รหัสผ่านไม่ถูกต้อง")
 
-# กำหนดเป้าหมายไฟล์ที่จะดึงมาแสดงผล
-target_file = None
-
+# เมนูอัปโหลดไฟล์สำหรับแอดมิน
 if st.session_state.is_admin and selected_mode == "อัปโหลดไฟล์ Excel ใหม่ (แอดมิน)":
     st.sidebar.markdown("---")
     st.sidebar.markdown("#### 📤 อัปโหลดไฟล์ประจำวัน")
     uploaded_file = st.sidebar.file_uploader("เลือกไฟล์ Excel ของคุณ", type=["xlsx", "xls"])
     if uploaded_file is not None:
-        # บันทึกไฟล์ด้วยชื่อเดิม (หรือจะใช้ชื่อตามไฟล์ที่อัปโหลดเข้ามาจริงก็ได้)
-        CENTRAL_FILE_PATH = uploaded_file.name
-        with open(CENTRAL_FILE_PATH, "wb") as f:
+        save_path = uploaded_file.name
+        with open(save_path, "wb") as f:
             f.write(uploaded_file.getbuffer())
+        
+        # บันทึกชื่อไฟล์ใหม่ลง session state และรีเฟรชทันที
+        st.session_state.current_file_name = save_path
         st.sidebar.success(f"✅ อัปโหลดไฟล์ {uploaded_file.name} สำเร็จ!")
         st.rerun()
     
@@ -79,14 +87,8 @@ if st.session_state.is_admin and selected_mode == "อัปโหลดไฟ�
         st.session_state.is_admin = False
         st.rerun()
 
-# ตรวจสอบไฟล์ที่จะนำมาประมวลผล (อ่านจากไฟล์กลางบนระบบ)
-if os.path.exists(CENTRAL_FILE_PATH):
-    target_file = CENTRAL_FILE_PATH
-else:
-    target_file = None
-
 # 3. เริ่มประมวลผลข้อมูลหากมีไฟล์พร้อมใช้งาน
-if target_file is not None:
+if target_file and os.path.exists(target_file):
     try:
         df_raw = pd.read_excel(target_file, sheet_name='ส่งเสี่ย', header=5)
         
