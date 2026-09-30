@@ -20,37 +20,59 @@ color_map = {
     'SPG': '#FF7F50'   # สีส้ม
 }
 
-# กำหนดชื่อไฟล์กลางบน Server
+# กำหนดชื่อไฟล์กลางในระบบ
 CENTRAL_FILE_PATH = "20.09.69 แปลง.xlsx"
 
-# 2. ส่วนจัดการไฟล์ใน Sidebar (เลือกได้ว่าจะใช้ไฟล์กลาง หรือจะอัปโหลดไฟล์ใหม่ทับ)
+# 2. ระบบจัดการสิทธิ์แอดมินใน Sidebar
 st.sidebar.markdown("### 📁 จัดการข้อมูล Excel")
-data_source = st.sidebar.radio(
-    "เลือกแหล่งที่มาของข้อมูล:",
-    ("ใช้ข้อมูลจากระบบกลาง (Server)", "อัปโหลดไฟล์ Excel ใหม่")
-)
 
+# ตั้งรหัสผ่านสำหรับแอดมินที่นี่ (สามารถเปลี่ยนเลขได้ตามต้องการ)
+ADMIN_PASSWORD = "1234" 
+
+# สร้างปุ่มให้เลือกโหมด (สำหรับแอดมินใส่รหัส)
+mode_options = ["ดูข้อมูลทั่วไป (ผู้ชมทั่วไป)"]
+if "is_admin" not in st.session_state:
+    st.session_state.is_admin = False
+
+if st.session_state.is_admin:
+    mode_options.append("อัปโหลดไฟล์ Excel ใหม่ (แอดมิน)")
+
+selected_mode = st.sidebar.selectbox("เลือกโหมดการใช้งาน:", mode_options)
+
+# ถ้ายัังไม่ได้เป็นแอดมิน ให้มีช่องกรอกรหัสผ่านด้านล่าง
+if not st.session_state.is_admin:
+    st.sidebar.markdown("---")
+    with st.sidebar.expander("🔐 สำหรับแอดมิน (อัปเดตข้อมูล)"):
+        password_input = st.text_input("กรอกรหัสผ่านแอดมิน", type="password")
+        if st.button("เข้าสู่ระบบแอดมิน"):
+            if password_input == ADMIN_PASSWORD:
+                st.session_state.is_admin = True
+                st.success("เข้าสู่ระบบสำเร็จ!")
+                st.rerun()
+            else:
+                st.error("รหัสผ่านไม่ถูกต้อง")
+
+# กำหนดเป้าหมายไฟล์ที่จะดึงมาแสดงผล
 target_file = None
 
-if data_source == "อัปโหลดไฟล์ Excel ใหม่":
+if st.session_state.is_admin and selected_mode == "อัปโหลดไฟล์ Excel ใหม่ (แอดมิน)":
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("#### 📤 อัปโหลดไฟล์ประจำวัน")
     uploaded_file = st.sidebar.file_uploader("เลือกไฟล์ Excel ของคุณ", type=["xlsx", "xls"])
     if uploaded_file is not None:
-        # บันทึกไฟล์ที่อัปโหลดใหม่ทับไฟล์กลางบน Server ทันที
         with open(CENTRAL_FILE_PATH, "wb") as f:
             f.write(uploaded_file.getbuffer())
         st.sidebar.success("✅ อัปโหลดและบันทึกไฟล์ใหม่เรียบร้อยแล้ว!")
-        target_file = CENTRAL_FILE_PATH
-    else:
-        # หากยังไม่ได้เลือกไฟล์ใหม่ ให้ลองดึงไฟล์กลางมาแสดงก่อนถ้ามี
-        if os.path.exists(CENTRAL_FILE_PATH):
-            target_file = CENTRAL_FILE_PATH
-        else:
-            target_file = None
+    
+    if st.sidebar.button("ออกจากระบบแอดมิน"):
+        st.session_state.is_admin = False
+        st.rerun()
+
+# ตรวจสอบไฟล์ที่จะนำมาประมวลผล (อ่านจากไฟล์กลางบนระบบ)
+if os.path.exists(CENTRAL_FILE_PATH):
+    target_file = CENTRAL_FILE_PATH
 else:
-    if os.path.exists(CENTRAL_FILE_PATH):
-        target_file = CENTRAL_FILE_PATH
-    else:
-        target_file = None
+    target_file = None
 
 # 3. เริ่มประมวลผลข้อมูลหากมีไฟล์พร้อมใช้งาน
 if target_file is not None:
@@ -92,7 +114,7 @@ if target_file is not None:
                 
         df['บริษัท'] = df['บริษัท_raw'].apply(map_company)
         
-        # Sidebar ตัวกรองข้อมูล
+        # Sidebar ตัวกรองข้อมูลสำหรับผู้ใช้งานทั่วไป
         st.sidebar.markdown("---")
         st.sidebar.markdown("### 🎯 ตัวกรองการแสดงผล")
         
@@ -245,5 +267,5 @@ if target_file is not None:
     except Exception as e:
         st.error(f"เกิดข้อผิดพลาดในการประมวลผลไฟล์: {e}")
 else:
-    st.warning("⚠️ ยังไม่พบไฟล์ข้อมูลในระบบกลาง")
-    st.info("💡 วิธีเริ่มต้น: ไปที่เมนูด้านซ้าย เลือก **'อัปโหลดไฟล์ Excel ใหม่'** แล้วอัปโหลดไฟล์ของคุณขึ้นไป ระบบจะบันทึกและแสดงผลทันทีครับ")
+    st.warning("⚠️ ยังไม่พบไฟล์ข้อมูลกลางในระบบ")
+    st.info("💡 คำแนะนำสำหรับแอดมิน: กรุณาขยายเมนู 'สำหรับแอดมิน' ด้านซ้าย ใส่รหัสผ่านเพื่ออัปโหลดไฟล์ตั้งต้นขึ้นระบบครับ")
