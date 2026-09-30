@@ -259,7 +259,7 @@ if os.path.exists(CENTRAL_FILE_PATH):
         st.markdown("---")
         
         # ตารางแสดงผล
-,       st.markdown(f"🏆 **5 สาขาที่สูงสุด และ 5 สาขาที่ต่ำที่สุด ({metric_title})**")
+        st.markdown(f"🏆 **5 สาขาที่สูงสุด และ 5 สาขาที่ต่ำที่สุด ({metric_title})**")
         if not df_filtered.empty:
             df_sorted = df_filtered.sort_values(by=selected_col, ascending=False).reset_index(drop=True)
             
